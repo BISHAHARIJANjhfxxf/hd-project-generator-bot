@@ -16,6 +16,7 @@ user_data_store = {}
 keyboard = ReplyKeyboardMarkup(
     [
         ["➕ Add Text"],
+        ["📊 Table Mode"],
         ["🔤 Select Font Size"],
         ["🎨 Select Heading Color"],
         ["📄 Generate Project"],
@@ -39,21 +40,55 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in user_data_store:
         return
 
+    # Reset
     if text == "🗑 Reset":
         user_data_store[user_id]["text"] = ""
         await update.message.reply_text("Data Cleared")
         return
 
+    # Font Size
     if text == "🔤 Select Font Size":
-        await update.message.reply_text("Send font size number (e.g., 12, 15, 18)")
+        await update.message.reply_text("Send body font size (e.g., 12, 15, 18)")
         context.user_data["awaiting_font"] = True
         return
 
+    if context.user_data.get("awaiting_font"):
+        user_data_store[user_id]["font_size"] = int(text)
+        context.user_data["awaiting_font"] = False
+        await update.message.reply_text("Font size updated")
+        return
+
+    # Heading Color
     if text == "🎨 Select Heading Color":
-        await update.message.reply_text("Send color name (blue/red/black) or hex (#1F4E79)")
+        await update.message.reply_text("Send color name or hex (#1F4E79)")
         context.user_data["awaiting_color"] = True
         return
 
+    if context.user_data.get("awaiting_color"):
+        user_data_store[user_id]["color"] = text
+        context.user_data["awaiting_color"] = False
+        await update.message.reply_text("Heading color updated")
+        return
+
+    # Table Mode
+    if text == "📊 Table Mode":
+        await update.message.reply_text(
+            "Send table rows separated by | \nType DONE when finished"
+        )
+        context.user_data["table_mode"] = True
+        user_data_store[user_id]["text"] += "#table\n"
+        return
+
+    if context.user_data.get("table_mode"):
+        if text == "DONE":
+            user_data_store[user_id]["text"] += "#endtable\n"
+            context.user_data["table_mode"] = False
+            await update.message.reply_text("Table added")
+        else:
+            user_data_store[user_id]["text"] += text + "\n"
+        return
+
+    # Generate
     if text == "📄 Generate Project":
         file_path = generate_pdf(
             user_data_store[user_id]["text"],
@@ -63,19 +98,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_document(document=open(file_path, "rb"))
         return
 
-    if context.user_data.get("awaiting_font"):
-        user_data_store[user_id]["font_size"] = int(text)
-        context.user_data["awaiting_font"] = False
-        await update.message.reply_text("Font size updated")
-        return
-
-    if context.user_data.get("awaiting_color"):
-        user_data_store[user_id]["color"] = text
-        context.user_data["awaiting_color"] = False
-        await update.message.reply_text("Heading color updated")
-        return
-
-    # Default: add text
+    # Default Add Text
     user_data_store[user_id]["text"] += text + "\n"
     await update.message.reply_text("Text added")
 
