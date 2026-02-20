@@ -1,18 +1,14 @@
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 )
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch
 
-def add_page_number(canvas, doc):
-    canvas.setFont("Helvetica", 10)
-    canvas.drawRightString(580, 20, f"Page {doc.page}")
+def generate_pdf(text, body_size=15, heading_color="black"):
 
-def generate_pdf(text):
-
-    file_path = "HD_Project_Output.pdf"
+    file_path = "FINAL_Project.pdf"
 
     doc = SimpleDocTemplate(
         file_path,
@@ -21,29 +17,29 @@ def generate_pdf(text):
         leftMargin=60,
         topMargin=60,
         bottomMargin=50,
-        compression=0  # ensures no raster compression
+        compression=0
     )
 
-    styles = getSampleStyleSheet()
+    heading_size = body_size + 5
 
     normal_style = ParagraphStyle(
         name="NormalStyle",
-        parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=12,
-        leading=18
+        fontSize=body_size,
+        leading=body_size + 6
     )
 
-    chapter_style = ParagraphStyle(
-        name="ChapterStyle",
-        parent=styles["Heading1"],
+    heading_style = ParagraphStyle(
+        name="HeadingStyle",
         fontName="Helvetica-Bold",
-        fontSize=18,
-        spaceAfter=12
+        fontSize=heading_size,
+        leading=heading_size + 6,
+        spaceAfter=10
     )
 
     elements = []
     lines = text.split("\n")
+    table_mode = False
     table_buffer = []
 
     def flush_table():
@@ -52,10 +48,10 @@ def generate_pdf(text):
             table = Table(table_buffer, repeatRows=1)
             table.setStyle(TableStyle([
                 ('GRID', (0,0), (-1,-1), 1, colors.black),
-                ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F2F2F2")),
+                ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
                 ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                 ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-                ('FONTSIZE', (0,0), (-1,-1), 11),
+                ('FONTSIZE', (0,0), (-1,-1), body_size-2),
             ]))
             elements.append(table)
             elements.append(Spacer(1, 0.3 * inch))
@@ -64,13 +60,17 @@ def generate_pdf(text):
     for line in lines:
         stripped = line.strip()
 
-        if "|" in line:
-            row = [cell.strip() for cell in line.strip("|").split("|")]
-            table_buffer.append(row)
+        if stripped == "#table":
+            table_mode = True
             continue
 
-        if "\t" in line:
-            row = [cell.strip() for cell in line.split("\t")]
+        if stripped == "#endtable":
+            table_mode = False
+            flush_table()
+            continue
+
+        if table_mode:
+            row = [cell.strip() for cell in stripped.split("|")]
             table_buffer.append(row)
             continue
 
@@ -78,7 +78,12 @@ def generate_pdf(text):
 
         if stripped.lower().startswith("chapter"):
             elements.append(PageBreak())
-            elements.append(Paragraph(stripped, chapter_style))
+            elements.append(
+                Paragraph(
+                    f'<b><font color="{heading_color}">{stripped}</font></b>',
+                    heading_style
+                )
+            )
             elements.append(Spacer(1, 0.3 * inch))
         elif stripped == "":
             elements.append(Spacer(1, 0.2 * inch))
@@ -87,7 +92,6 @@ def generate_pdf(text):
             elements.append(Spacer(1, 0.2 * inch))
 
     flush_table()
-
-    doc.build(elements, onLaterPages=add_page_number)
+    doc.build(elements)
 
     return file_path
