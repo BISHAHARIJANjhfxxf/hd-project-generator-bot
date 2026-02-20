@@ -13,10 +13,10 @@ def generate_pdf(text, body_size=15, heading_color="black"):
     doc = SimpleDocTemplate(
         file_path,
         pagesize=A4,
-        rightMargin=50,
+        rightMargin=60,
         leftMargin=60,
         topMargin=60,
-        bottomMargin=50,
+        bottomMargin=60,
         compression=0
     )
 
@@ -33,12 +33,13 @@ def generate_pdf(text, body_size=15, heading_color="black"):
         name="HeadingStyle",
         fontName="Helvetica-Bold",
         fontSize=heading_size,
-        leading=heading_size + 6,
+        leading=heading_size + 8,
         spaceAfter=10
     )
 
     elements = []
     lines = text.split("\n")
+
     table_mode = False
     table_buffer = []
 
@@ -51,7 +52,8 @@ def generate_pdf(text, body_size=15, heading_color="black"):
                 ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
                 ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                 ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-                ('FONTSIZE', (0,0), (-1,-1), body_size-2),
+                ('FONTSIZE', (0,0), (-1,-1), body_size - 1),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
             ]))
             elements.append(table)
             elements.append(Spacer(1, 0.3 * inch))
@@ -60,6 +62,7 @@ def generate_pdf(text, body_size=15, heading_color="black"):
     for line in lines:
         stripped = line.strip()
 
+        # TABLE BLOCK START
         if stripped == "#table":
             table_mode = True
             continue
@@ -69,6 +72,12 @@ def generate_pdf(text, body_size=15, heading_color="black"):
             flush_table()
             continue
 
+        # AUTO TABLE IF LINE HAS |
+        if "|" in stripped:
+            row = [cell.strip() for cell in stripped.split("|")]
+            table_buffer.append(row)
+            continue
+
         if table_mode:
             row = [cell.strip() for cell in stripped.split("|")]
             table_buffer.append(row)
@@ -76,6 +85,7 @@ def generate_pdf(text, body_size=15, heading_color="black"):
 
         flush_table()
 
+        # CHAPTER DETECTION
         if stripped.lower().startswith("chapter"):
             elements.append(PageBreak())
             elements.append(
@@ -84,8 +94,19 @@ def generate_pdf(text, body_size=15, heading_color="black"):
                     heading_style
                 )
             )
-            elements.append(Spacer(1, 0.3 * inch))
-        elif stripped == "":
+            elements.append(Spacer(1, 0.4 * inch))
+            continue
+
+        # MARKDOWN BOLD SUPPORT
+        if stripped.startswith("**") and stripped.endswith("**"):
+            bold_text = stripped.replace("**", "")
+            elements.append(
+                Paragraph(f"<b>{bold_text}</b>", normal_style)
+            )
+            elements.append(Spacer(1, 0.2 * inch))
+            continue
+
+        if stripped == "":
             elements.append(Spacer(1, 0.2 * inch))
         else:
             elements.append(Paragraph(stripped, normal_style))
